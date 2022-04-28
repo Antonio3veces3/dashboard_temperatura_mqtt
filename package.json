@@ -1,0 +1,22 @@
+{
+  "name": "mqtt_mongodb_dashboard",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chart.js": "^3.7.1",
+    "cors": "^2.8.5",
+    "express": "^4.17.3",
+    "mongodb": "^4.5.0",
+    "mongoose": "^6.3.0",
+    "mqtt": "^4.3.7",
+    "nodemon": "^2.0.15",
+    "socket.io": "^4.5.0"
+  }
+}
