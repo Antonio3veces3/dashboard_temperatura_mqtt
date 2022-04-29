@@ -1,26 +1,17 @@
 const cors = require('cors');
 const app = require('express')();
+const http = require('http');
+const server = http.createServer(app);
+const {Server} = require('socket.io');
+const io = new Server(server);
+let count = 0;
 
-app.use(cors());
-app.listen(3000,()=>{
-    console.log('Listening on 3000');
-});
-app.get('/', (req, res)=>{
-    res.send({res: 'Bienvenido'});
-})
-
-app.get('/tramas', async(req,res)=>{
-    try {
-        const list = await modelTrama.find();
-        res.send(list);
-    } catch (error) {
-        res.send(error);
-    }
-});
-
+//CONEXION MQTT
 const mqtt = require('mqtt');
 const clientMqtt = mqtt.connect('mqtt://test.mosquitto.org');
+clientMqtt.on('connect', connect);
 
+//CONEXION MONGO DB
 const mongoose = require('mongoose');
 
 const mongodb_URI = 'mongodb://localhost:27017/tramas_mqtt';
@@ -32,6 +23,7 @@ mongoose.connect(mongodb_URI,{
   .then(db => console.log(`Conectado a la base de datos ${db.connections[0].name}`))
   .catch(console.log);
 
+  
 Schema = mongoose.Schema;
 
 const schema = {
@@ -45,14 +37,39 @@ const schema = {
 
 const modelTrama =  mongoose.model('trama', schema.tramaSchema);
 
+//RUTAS SERVIDOR
+app.use(cors());
+app.get('/', (req, res)=>{
+    res.sendFile(__dirname + '/html/index.html');
+})
 
 
-/*const mostrar = async ( )=>{
-    const list = await modelTrama.find();
-    console.log(list);
-}*/
+//CONEXION SOCKET.IO
+io.on('connection', (socket)=>{
+    console.log('User connected');
+    getTramas().then((data)=>{
+        socket.emit('vectorTemp', data);
+    });
+    clientMqtt.on('message', (topic, message)=>{
+        console.log(`${topic} - ${parseInt(message,10)}`);
+        console.log(count);
+        if(count == 9)  {
+            count = 0;
+            getTramas().then((data)=>{
+                socket.emit('vectorTemp', data);
+            });
+            return;
+        }
+        count++;
+        postTrama(parseInt(message,10), getFecha());
+    });
+    socket.on('disconnect',()=>console.log('User disconnected'));
+    socket.emit('count', count);
+    
+})
 
 
+//FUNCIONES MQTT
 const postTrama = async (temperatura, date) => {
     const trama= new modelTrama({
         name: 'temperatura',
@@ -61,8 +78,22 @@ const postTrama = async (temperatura, date) => {
     });
 
     const result = await trama.save();
-    console.log('AGREGADO CORRECTAMENTE');
+    console.log('REGISTRO AGREGADO CORRECTAMENTE');
 }
+
+const getTramas = async()=>{
+    try {
+        let newArray = new Array();
+        const list = await modelTrama.find();
+        let n = list.length;
+        for( let  i= n - 1; i>= n-10; i--){
+            newArray.push(list[i]);
+        }
+        return newArray.reverse();
+    } catch (error) {
+        res.send(error);
+    }
+};
 
 function connect() { 
     clientMqtt.subscribe('carg/temperatura', (err)=>{
@@ -88,12 +119,8 @@ function addZero (num){
     return num;
   }
 
-function message (topic, message){
-    console.log(`${topic} - ${parseInt(message)}`);
-    postTrama(message, getFecha());
-}
 
-clientMqtt.on('connect', connect);
-clientMqtt.on('message', message);
-
+server.listen(3000, ()=>{
+    console.log('Listing on 3000');
+});
 module.exports = modelTrama;
